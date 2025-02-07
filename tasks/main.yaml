@@ -4,3 +4,9 @@
   loop: "{{ harica_api_accounts | dict2items(key_name='type', value_name='details') }}"
   loop_control:
     loop_var: login
+
+- name: Request certificates
+  include_tasks: request_cert.yaml
+  loop: "{{ certificates | dict2items | map(attribute='value') | list }}"
+  loop_control:
+    loop_var: certificate

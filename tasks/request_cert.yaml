@@ -1,0 +1,91 @@
+- name: Request certificate
+  vars:
+    domains: "{{ ([certificate.common_name] + certificate.subject_alt_names) | unique | map('json_query', '{\"domain\": @}') | to_json }}"
+    file_csr: "{{ lookup('file', certificate.csr_path) if certificate.csr_path is defined }}"
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/ServerCertificate/RequestServerCertificate"
+    method: 'POST'
+    headers: "{{ harica_api_issuer_headers }}"
+    timeout: 60
+    body_format: 'form-multipart'
+    body:
+      # Note: api takes the first domain in the list as CN..
+      domains: "{{ domains }}"
+      domainsString: "{{ domains }}"
+      duration: '1' # 1 year..
+      isManualCSR: 'true'
+      consentSameKey: 'false'
+      transactionType: "{{ certificate.type | default('DV') }}"
+      csr: "{{ certificate.csr | default(file_csr) }}"
+      friendlyName: "Ansible {{ certificate.common_name }} {{ now(fmt='%d/%m/%y %H:%M:%S') }}"
+  register: request_id
+  delegate_to: localhost
+
+- name: Fail if no ID was provided
+  fail:
+    msg: 'We did not get a cert request ID, did we try to re-use a private key?'
+  when: (request_id.json.id | default(None)) is none
+  delegate_to: localhost
+
+- name: Get transaction details
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/OrganizationValidatorSSL/GetSSLReviewableTransactions"
+    method: POST
+    headers: "{{ harica_api_signer_headers }}"
+    timeout: 60
+    body_format: 'json'
+    body:
+      startIndex: 0
+      filterPostDTOs: []
+      status: 'Pending'
+  register: pending_reviews
+  delegate_to: localhost
+
+- name: Approve certificate
+  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', request_id.json.id) | first).reviewGetDTOs }}"
+  loop_control:
+    loop_var: review_id
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/OrganizationValidatorSSL/UpdateReviews"
+    method: POST
+    headers: "{{ harica_api_signer_headers }}"
+    timeout: 60
+    body_format: 'form-multipart'
+    body:
+      reviewId: "{{ review_id.reviewId }}"
+      isValid: 'true'
+      informApplicant: 'false'
+      reviewMessage: "Approved by ansible at {{ now(fmt='%d/%m/%y %H:%M:%S') }}"
+      reviewValue: "{{ review_id.reviewValue }}"
+  delegate_to: localhost
+
+- name: Get signed certificate
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/Certificate/GetCertificate"
+    method: 'POST'
+    headers: "{{ harica_api_issuer_headers }}"
+    timeout: 60
+    body_format: 'json'
+    body:
+      id: "{{ request_id.json.id }}"
+  register: signed_cert
+  delegate_to: localhost
+
+- name: Write certificate to files
+  vars:
+    bundle: "{{ signed_cert.json.pemBundle | regex_findall('(?s)-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----') }}"
+    targets:
+      - dest: "{{ certificate.fullchain_dest | default(omit) }}"
+        content: "{{ bundle | join('\n') }}"
+      - dest: "{{ certificate.cert_dest | default(omit) }}"
+        content: "{{ bundle[0] }}"
+      - dest: "{{ certificate.chain_dest | default(omit) }}"
+        content: "{{ bundle[1:] | join('\n') }}"
+  loop: "{{ targets }}"
+  loop_control:
+    loop_var: 'file'
+    label: "{{ file.dest }}"
+  when: file.dest != omit
+  copy:
+    dest: "{{ file.dest }}"
+    content: "{{ file.content }}"
