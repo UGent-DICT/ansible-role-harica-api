@@ -1,0 +1,6 @@
+---
+- name: Login accounts
+  include_tasks: login.yaml
+  loop: "{{ harica_api_accounts | dict2items(key_name='type', value_name='details') }}"
+  loop_control:
+    loop_var: login

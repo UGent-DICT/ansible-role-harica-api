@@ -1,0 +1,77 @@
+---
+- name: Get pre-login request verification Token
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}"
+    method: 'GET'
+    return_content: true
+  register: pre_login_html
+  delegate_to: localhost
+
+  # Ideally ansible.general.xml gets support for lxml.html, but until then;
+- name: Extract initial RV token
+  ansible.builtin.command:
+    cmd: xmllint --html --xpath 'string(/html/head/input[@name="__RequestVerificationToken"]/@value)' -
+    stdin: "{{ pre_login_html.content }}"
+  changed_when: false
+  register: initial_rv_token
+  delegate_to: localhost
+
+- name: "Login {{ login.type }}"
+  when: (login.details.mfa_token | default(None)) is none
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/User/Login"
+    method: 'POST'
+    return_content: true
+    headers:
+      Cookie: "{{ pre_login_html.cookies_string }}"
+      RequestVerificationToken: "{{ initial_rv_token.stdout }}"
+    body_format: 'json'
+    body:
+      email: "{{ login.details.email }}"
+      password: "{{ login.details.password }}"
+  register: login_token
+  delegate_to: localhost
+
+- name: "Login 2FA {{ login.type }}"
+  when: (login.details.mfa_token | default(None)) is not none
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}/api/User/Login2FA"
+    method: 'POST'
+    return_content: true
+    headers:
+      Cookie: "{{ pre_login_html.cookies_string }}"
+      RequestVerificationToken: "{{ initial_rv_token.stdout }}"
+    body_format: 'json'
+    body:
+      email: "{{ login.details.email }}"
+      password: "{{ login.details.password }}"
+      token: "{{ login.details.mfa_token }}"
+  register: login_token_mfa
+  delegate_to: localhost
+
+- name: Get post-login request verification token
+  ansible.builtin.uri:
+    url: "{{ harica_api_base_url }}"
+    method: 'GET'
+    return_content: true
+    headers:
+      Cookie: "{{ pre_login_html.cookies | combine(login_token.cookies | default({}), login_token_mfa.cookies | default({})) | items | map('join', '=') | join('; ') }}"
+      Authorization: "{{ login_token.content | default(login_token_mfa.content) }}"
+  register: post_login_html
+  delegate_to: localhost
+
+- name: Extract  RV token
+  ansible.builtin.command:
+    cmd: xmllint --html --xpath 'string(/html/head/input[@name="__RequestVerificationToken"]/@value)' -
+    stdin: "{{ post_login_html.content }}"
+  changed_when: false
+  register: rv_token
+  delegate_to: localhost
+
+- name: "Set harica {{ login.type }} login facts"
+  set_fact:
+    "harica_api_{{ login.type }}_headers":
+      Cookie: "{{ pre_login_html.cookies | combine(login_token.cookies | default({}), login_token_mfa.cookies | default({}), post_login_html.cookies) | items | map('join', '=') | join('; ') }}"
+      RequestVerificationToken: "{{ rv_token.stdout }}"
+      Authorization: "{{ login_token.content | default(login_token_mfa.content) }}"
+  delegate_to: localhost
