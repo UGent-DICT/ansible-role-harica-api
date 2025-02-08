@@ -60,7 +60,7 @@
   register: post_login_html
   delegate_to: localhost
 
-- name: Extract  RV token
+- name: Extract RV token
   ansible.builtin.command:
     cmd: xmllint --html --xpath 'string(/html/head/input[@name="__RequestVerificationToken"]/@value)' -
     stdin: "{{ post_login_html.content }}"
