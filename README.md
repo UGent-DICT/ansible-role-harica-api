@@ -11,6 +11,7 @@ The shell tool `xmllint` should be installed. This is provided by the package:
 - Ubuntu: `libxml2-utils`
 - RHEL: `libxml2`
 - Arch Linux: `libxml2`
+- Gentoo: `dev-libs/libxml2` (enable python use flag)
 
 Role Variables
 --------------
