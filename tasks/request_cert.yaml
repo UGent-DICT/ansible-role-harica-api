@@ -45,7 +45,10 @@
   delegate_to: localhost
 
 - name: Approve certificate
-  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', (request_id.json.id | default(harica_api_certificate.request_id))) | first).reviewGetDTOs }}"
+  vars:
+    pending_review: "{{ pending_reviews.json | selectattr('transactionId', 'equalto', (request_id.json.id | default(harica_api_certificate.request_id))) }}"
+  when: (pending_review | length) > 0
+  loop: "{{ pending_review[0].reviewGetDTOs }}"
   loop_control:
     loop_var: review_id
   ansible.builtin.uri:
