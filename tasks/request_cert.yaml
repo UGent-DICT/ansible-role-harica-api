@@ -70,7 +70,7 @@
     timeout: 60
     body_format: 'json'
     body:
-      id: "{{ request_id.json.id | harica_api_certificate.request_id }}"
+      id: "{{ request_id.json.id | default(harica_api_certificate.request_id) }}"
   register: signed_cert
   delegate_to: localhost
 
