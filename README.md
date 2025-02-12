@@ -6,12 +6,13 @@ An ansible role to request, approve and download server certificates from harica
 Requirements
 ------------
 
-The shell tool `xmllint` should be installed. This is provided by the package:
-- Debian: `libxml2-utils`
-- Ubuntu: `libxml2-utils`
-- RHEL: `libxml2`
-- Arch Linux: `libxml2`
-- Gentoo: `dev-libs/libxml2` (enable python use flag)
+- The shell tool `xmllint` should be installed. This is provided by the package:
+  - Debian: `libxml2-utils`
+  - Ubuntu: `libxml2-utils`
+  - RHEL: `libxml2`
+  - Arch Linux: `libxml2`
+  - Gentoo: `dev-libs/libxml2` (enable python use flag)
+- The python library `jmespath` should be installed for the `json_query` filter.
 
 Role Variables
 --------------
