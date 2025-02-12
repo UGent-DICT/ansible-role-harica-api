@@ -10,3 +10,4 @@
   loop: "{{ certificates | dict2items | map(attribute='value') | list }}"
   loop_control:
     loop_var: certificate
+  ignore_errors: true
