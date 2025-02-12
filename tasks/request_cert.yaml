@@ -1,8 +1,8 @@
 - name: Request certificate
   vars:
-    domains: "{{ ([certificate.common_name] + certificate.subject_alt_names) | unique | map('json_query', '{\"domain\": @}') | to_json }}"
-    file_csr: "{{ lookup('file', certificate.csr_path) if certificate.csr_path is defined }}"
-  when: certificate.request_id is not defined
+    domains: "{{ ([harica_api_certificate.common_name] + harica_api_certificate.subject_alt_names) | unique | map('json_query', '{\"domain\": @}') | to_json }}"
+    file_csr: "{{ lookup('file', harica_api_certificate.csr_path) if harica_api_certificate.csr_path is defined }}"
+  when: harica_api_certificate.request_id is not defined
   ansible.builtin.uri:
     url: "{{ harica_api_base_url }}/api/ServerCertificate/RequestServerCertificate"
     method: 'POST'
@@ -16,9 +16,9 @@
       duration: '1' # 1 year..
       isManualCSR: 'true'
       consentSameKey: 'false'
-      transactionType: "{{ certificate.type | default('DV') }}"
-      csr: "{{ certificate.csr | default(file_csr) }}"
-      friendlyName: "Ansible {{ certificate.common_name }} {{ now(fmt='%d/%m/%y %H:%M:%S') }}"
+      transactionType: "{{ harica_api_certificate.type | default('DV') }}"
+      csr: "{{ harica_api_certificate.csr | default(file_csr) }}"
+      friendlyName: "Ansible {{ harica_api_certificate.common_name }} {{ now(fmt='%d/%m/%y %H:%M:%S') }}"
   register: request_id
   delegate_to: localhost
 
@@ -26,7 +26,7 @@
   fail:
     msg: 'We did not get a cert request ID, did we try to re-use a private key?'
   when:
-    - certificate.request_id is not defined
+    - harica_api_certificate.request_id is not defined
     - (request_id.json.id | default(None)) is none
   delegate_to: localhost
 
@@ -45,7 +45,7 @@
   delegate_to: localhost
 
 - name: Approve certificate
-  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', (request_id.json.id | default(certificate.request_id)) | first).reviewGetDTOs }}"
+  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', (request_id.json.id | default(harica_api_certificate.request_id)) | first).reviewGetDTOs }}"
   loop_control:
     loop_var: review_id
   ansible.builtin.uri:
@@ -70,7 +70,7 @@
     timeout: 60
     body_format: 'json'
     body:
-      id: "{{ request_id.json.id | certificate.request_id }}"
+      id: "{{ request_id.json.id | harica_api_certificate.request_id }}"
   register: signed_cert
   delegate_to: localhost
 
@@ -78,11 +78,11 @@
   vars:
     bundle: "{{ signed_cert.json.pemBundle | regex_findall('(?s)-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----') }}"
     targets:
-      - dest: "{{ certificate.fullchain_dest | default(omit) }}"
+      - dest: "{{ harica_api_certificate.fullchain_dest | default(omit) }}"
         content: "{{ bundle | join('\n') }}"
-      - dest: "{{ certificate.cert_dest | default(omit) }}"
+      - dest: "{{ harica_api_certificate.cert_dest | default(omit) }}"
         content: "{{ bundle[0] }}"
-      - dest: "{{ certificate.chain_dest | default(omit) }}"
+      - dest: "{{ harica_api_certificate.chain_dest | default(omit) }}"
         content: "{{ bundle[1:] | join('\n') }}"
   loop: "{{ targets }}"
   loop_control:

@@ -30,9 +30,9 @@ This role requires the following variables to work:
       password: myothersupersecretpass
       mfa_token: "{{ lookup('ansible.builtin.pipe', '/path/to/my/totp/binary') }}"
   ```
-- `certificates`: A hash that can contain any number of certificates. Each of the entries should have a `common_name`, an optional `subject_alt_names` list, one or all of `fullchain_dest`, `cert_dest` and `chain_dest`, and one of `csr` or `csr_path` (the former being the csr in string form, the latter a filepath to the csr). An example:
+- `harica_api_certificates`: A hash that can contain any number of certificates. Each of the entries should have a `common_name`, an optional `subject_alt_names` list, one or all of `fullchain_dest`, `cert_dest` and `chain_dest`, and one of `csr` or `csr_path` (the former being the csr in string form, the latter a filepath to the csr). An example:
   ```
-  certificates:
+  harica_api_certificates:
     cert1:
       common_name: my.domain.tld
       csr_path: /tmp/csr.pem
@@ -46,7 +46,7 @@ This role requires the following variables to work:
   ```
   A certificate can also have a `request_id`, which can then be used to skip the issuing task and go directly to the sign and download task. Example:
   ```
-  certificates:
+  harica_api_certificates:
     cert1:
       request_id: my-request-id
       fullchain_dest: /etc/pki/httpd/my.domain.tld.pem

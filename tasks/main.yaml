@@ -7,7 +7,7 @@
 
 - name: Request certificates
   include_tasks: request_cert.yaml
-  loop: "{{ certificates | dict2items | map(attribute='value') | list }}"
+  loop: "{{ harica_api_certificates | dict2items | map(attribute='value') | list }}"
   loop_control:
-    loop_var: certificate
+    loop_var: harica_api_certificate
   ignore_errors: true
