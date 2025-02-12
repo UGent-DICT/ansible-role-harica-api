@@ -44,6 +44,13 @@ This role requires the following variables to work:
       cert_dest: /etc/pki/httpd/my.second.domain.tld.crt
       chain_dest: /etc/pki/httpd/my.second.domain.tld.chain
   ```
+  A certificate can also have a `request_id`, which can then be used to skip the issuing task and go directly to the sign and download task. Example:
+  ```
+  certificates:
+    cert1:
+      request_id: my-request-id
+      fullchain_dest: /etc/pki/httpd/my.domain.tld.pem
+   ```
 
 License
 -------

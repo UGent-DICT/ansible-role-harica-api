@@ -2,6 +2,7 @@
   vars:
     domains: "{{ ([certificate.common_name] + certificate.subject_alt_names) | unique | map('json_query', '{\"domain\": @}') | to_json }}"
     file_csr: "{{ lookup('file', certificate.csr_path) if certificate.csr_path is defined }}"
+  when: certificate.request_id is not defined
   ansible.builtin.uri:
     url: "{{ harica_api_base_url }}/api/ServerCertificate/RequestServerCertificate"
     method: 'POST'
@@ -24,7 +25,9 @@
 - name: Fail if no ID was provided
   fail:
     msg: 'We did not get a cert request ID, did we try to re-use a private key?'
-  when: (request_id.json.id | default(None)) is none
+  when:
+    - certificate.request_id is not defined
+    - (request_id.json.id | default(None)) is none
   delegate_to: localhost
 
 - name: Get transaction details
@@ -42,7 +45,7 @@
   delegate_to: localhost
 
 - name: Approve certificate
-  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', request_id.json.id) | first).reviewGetDTOs }}"
+  loop: "{{ (pending_reviews.json | selectattr('transactionId', 'equalto', (request_id.json.id | default(certificate.request_id)) | first).reviewGetDTOs }}"
   loop_control:
     loop_var: review_id
   ansible.builtin.uri:
@@ -67,7 +70,7 @@
     timeout: 60
     body_format: 'json'
     body:
-      id: "{{ request_id.json.id }}"
+      id: "{{ request_id.json.id | certificate.request_id }}"
   register: signed_cert
   delegate_to: localhost
 
